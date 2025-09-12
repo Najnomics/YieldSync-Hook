@@ -56,10 +56,10 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
     IYieldSyncAVS public immutable yieldSyncAVS;
     
     /// @notice Mapping of position ID to position data
-    mapping(bytes32 => PositionAdjustment.PositionData) public positions;
+    mapping(bytes32 => PositionAdjustment.PositionData) private _positions;
     
     /// @notice Mapping of pool ID to LST configuration
-    mapping(PoolId => LSTConfig) public poolConfigs;
+    mapping(PoolId => LSTConfig) private _poolConfigs;
     
     /// @notice Mapping of user to total IL prevented
     mapping(address => uint256) public totalILPrevented;
@@ -74,32 +74,6 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
     
-    event PositionRegistered(
-        bytes32 indexed positionId,
-        address indexed owner,
-        address indexed lstToken,
-        int24 tickLower,
-        int24 tickUpper,
-        uint128 liquidity
-    );
-    
-    event PositionAdjusted(
-        bytes32 indexed positionId,
-        address indexed owner,
-        int24 oldTickLower,
-        int24 oldTickUpper,
-        int24 newTickLower,
-        int24 newTickUpper,
-        uint256 yieldBPS,
-        uint256 estimatedILPrevented
-    );
-    
-    event PoolConfigured(
-        PoolId indexed poolId,
-        address indexed lstToken,
-        address indexed pairedToken,
-        bool autoAdjustmentEnabled
-    );
     
     event YieldDataUpdated(
         address indexed lstToken,
@@ -112,12 +86,12 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
     //////////////////////////////////////////////////////////////*/
     
     modifier onlyPositionOwner(bytes32 positionId) {
-        require(positions[positionId].owner == msg.sender, "YieldSync: not position owner");
+        require(_positions[positionId].owner == msg.sender, "YieldSync: not position owner");
         _;
     }
     
     modifier onlyValidPosition(bytes32 positionId) {
-        require(positions[positionId].owner != address(0), "YieldSync: position not found");
+        require(_positions[positionId].owner != address(0), "YieldSync: position not found");
         _;
     }
 
@@ -130,6 +104,16 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
         IYieldSyncAVS _yieldSyncAVS
     ) BaseHook(_poolManager) Ownable(msg.sender) {
         yieldSyncAVS = _yieldSyncAVS;
+    }
+
+    /// @notice Get position data
+    function positions(bytes32 positionId) external view returns (PositionAdjustment.PositionData memory) {
+        return _positions[positionId];
+    }
+
+    /// @notice Get pool configuration
+    function poolConfigs(PoolId poolId) external view returns (LSTConfig memory) {
+        return _poolConfigs[poolId];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -167,7 +151,7 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
         uint160,
         int24,
         bytes calldata
-    ) external override returns (bytes4) {
+    ) external returns (bytes4) {
         PoolId poolId = key.toId();
         
         // Auto-detect LST in pool
@@ -175,7 +159,7 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
             LSTDetection.detectLSTInPool(key);
         
         if (hasLST) {
-            poolConfigs[poolId] = LSTConfig({
+            _poolConfigs[poolId] = LSTConfig({
                 lstToken: lstToken,
                 pairedToken: pairedToken,
                 isLSTToken0: isLSTToken0,
@@ -192,21 +176,22 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
     /**
      * @notice Called after adding liquidity to register positions
      */
-    function afterAddLiquidity(
+    function _afterAddLiquidity(
         address sender,
         PoolKey calldata key,
         ModifyLiquidityParams calldata params,
-        BalanceDelta,
+        BalanceDelta delta,
+        BalanceDelta feesAccrued,
         bytes calldata
-    ) external override returns (bytes4, BalanceDelta) {
+    ) internal override returns (bytes4, BalanceDelta) {
         PoolId poolId = key.toId();
-        LSTConfig memory config = poolConfigs[poolId];
+        LSTConfig memory config = _poolConfigs[poolId];
         
         // Only track positions in LST pools with positive liquidity
         if (config.lstToken != address(0) && params.liquidityDelta > 0) {
             bytes32 positionId = _getPositionId(sender, poolId, params.tickLower, params.tickUpper);
             
-            positions[positionId] = PositionAdjustment.PositionData({
+            _positions[positionId] = PositionAdjustment.PositionData({
                 owner: sender,
                 poolId: poolId,
                 tickLower: params.tickLower,
@@ -238,14 +223,14 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
     /**
      * @notice Called before removing liquidity to check for yield adjustments
      */
-    function beforeRemoveLiquidity(
+    function _beforeRemoveLiquidity(
         address,
         PoolKey calldata key,
         ModifyLiquidityParams calldata params,
         bytes calldata
-    ) external override returns (bytes4) {
+    ) internal override returns (bytes4) {
         PoolId poolId = key.toId();
-        LSTConfig memory config = poolConfigs[poolId];
+        LSTConfig memory config = _poolConfigs[poolId];
         
         // Check for yield adjustment before position removal
         if (config.lstToken != address(0) && config.autoAdjustmentEnabled) {
@@ -259,13 +244,14 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
     /**
      * @notice Called after removing liquidity to clean up tracking
      */
-    function afterRemoveLiquidity(
+    function _afterRemoveLiquidity(
         address sender,
         PoolKey calldata key,
         ModifyLiquidityParams calldata params,
-        BalanceDelta,
+        BalanceDelta delta,
+        BalanceDelta feesAccrued,
         bytes calldata
-    ) external override returns (bytes4, BalanceDelta) {
+    ) internal override returns (bytes4, BalanceDelta) {
         PoolId poolId = key.toId();
         
         // Update liquidity tracking
@@ -287,7 +273,7 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
      * @param positionId The position ID to check
      */
     function _checkAndAdjustPosition(bytes32 positionId) internal {
-        PositionAdjustment.PositionData storage position = positions[positionId];
+        PositionAdjustment.PositionData storage position = _positions[positionId];
         if (position.owner == address(0) || !position.autoAdjustEnabled) return;
         
         // Get required adjustment from AVS
@@ -296,7 +282,7 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
             position.lastYieldAdjustment
         );
         
-        LSTConfig memory config = poolConfigs[position.poolId];
+        LSTConfig memory config = _poolConfigs[position.poolId];
         
         // Check if adjustment is needed
         if (requiredAdjustmentBPS >= config.adjustmentThresholdBPS &&
@@ -315,8 +301,8 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
         bytes32 positionId,
         uint256 yieldBPS
     ) internal {
-        PositionAdjustment.PositionData storage position = positions[positionId];
-        LSTConfig memory config = poolConfigs[position.poolId];
+        PositionAdjustment.PositionData storage position = _positions[positionId];
+        LSTConfig memory config = _poolConfigs[position.poolId];
         
         // Calculate new tick range based on yield accumulation
         (int24 newTickLower, int24 newTickUpper) = PositionAdjustment.calculateAdjustedTicks(
@@ -380,7 +366,7 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
         onlyValidPosition(positionId) 
         onlyPositionOwner(positionId)
     {
-        positions[positionId].autoAdjustEnabled = enabled;
+        _positions[positionId].autoAdjustEnabled = enabled;
     }
     
     /**
@@ -401,7 +387,7 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
             uint256 timeSinceLastAdjustment
         ) 
     {
-        PositionAdjustment.PositionData memory position = positions[positionId];
+        PositionAdjustment.PositionData memory position = _positions[positionId];
         require(position.owner != address(0), "YieldSync: position not found");
         
         currentYieldDrift = yieldSyncAVS.getRequiredAdjustment(
@@ -409,7 +395,7 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
             position.lastYieldAdjustment
         );
         
-        LSTConfig memory config = poolConfigs[position.poolId];
+        LSTConfig memory config = _poolConfigs[position.poolId];
         needsAdjustment = currentYieldDrift >= config.adjustmentThresholdBPS;
         
         potentialILPrevention = YieldCalculations.calculateILPrevented(
@@ -435,7 +421,7 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSy
         require(config.adjustmentThresholdBPS >= MIN_ADJUSTMENT_THRESHOLD, "YieldSync: threshold too low");
         require(config.adjustmentThresholdBPS <= MAX_ADJUSTMENT_THRESHOLD, "YieldSync: threshold too high");
         
-        poolConfigs[poolId] = config;
+        _poolConfigs[poolId] = config;
         emit PoolConfigured(poolId, config.lstToken, config.pairedToken, config.autoAdjustmentEnabled);
     }
     

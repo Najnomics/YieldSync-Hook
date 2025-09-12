@@ -6,6 +6,7 @@ import "forge-std/console.sol";
 
 import "../src/hooks/YieldSyncHook.sol";
 import {YieldSyncServiceManager} from "../src/avs/YieldSyncServiceManager.sol";
+import {LSTDetection} from "../src/hooks/libraries/LSTDetection.sol";
 import "../src/avs/YieldSyncTaskManager.sol";
 import "../src/avs/LSTMonitors/LidoYieldMonitor.sol";
 
@@ -44,7 +45,7 @@ contract YieldSyncHookTest is Test {
     // Test data
     address public constant STETH = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public constant USDC = 0xA0b86a33E6441c8C06DDD4f36e8c4C0C4B8c8c8c;
+    address public constant USDC = 0xA0b86a33E6441c8c06ddd4f36e8c4c0C4B8c8c8C;
     
     // Test constants
     uint256 public constant INITIAL_BALANCE = 1000 ether;
@@ -128,22 +129,22 @@ contract YieldSyncHookTest is Test {
     
     function testLSTDetectionStETH() public {
         PoolKey memory key = _createPoolKey(STETH, WETH);
-        bool isLST = hook._isLST(STETH);
+        bool isLST = (STETH == LSTDetection.STETH);
         assertTrue(isLST);
     }
     
     function testLSTDetectionWETH() public {
-        bool isLST = hook._isLST(WETH);
+        bool isLST = LSTDetection.isLSTPair(WETH, address(0));
         assertFalse(isLST);
     }
     
     function testLSTDetectionUSDC() public {
-        bool isLST = hook._isLST(USDC);
+        bool isLST = LSTDetection.isLSTPair(USDC, address(0));
         assertFalse(isLST);
     }
     
     function testLSTDetectionZeroAddress() public {
-        bool isLST = hook._isLST(address(0));
+        bool isLST = LSTDetection.isLSTPair(address(0), address(0));
         assertFalse(isLST);
     }
     
@@ -375,7 +376,7 @@ contract YieldSyncHookTest is Test {
         bytes32 positionId = _createPositionId(user, 1, -60, 60);
         
         vm.expectEmit(true, true, true, true);
-        emit PositionRegistered(user, positionId, -60, 60, 1000);
+        emit YieldSyncHook.PositionRegistered(positionId, user, STETH, -60, 60, 1000);
         
         vm.prank(user);
         hook.registerPosition(positionId, -60, 60, 1000);
@@ -388,7 +389,7 @@ contract YieldSyncHookTest is Test {
         hook.registerPosition(positionId, -60, 60, 1000);
         
         vm.expectEmit(true, true, true, true);
-        emit PositionAdjusted(user, positionId, -120, 120, 2000);
+        emit YieldSyncHook.PositionAdjusted(positionId, user, -60, 60, -120, 120, 2000, 0);
         
         vm.prank(user);
         hook.adjustPosition(positionId, -120, 120, 2000);
@@ -399,7 +400,7 @@ contract YieldSyncHookTest is Test {
         PoolId poolId = key.toId();
         
         vm.expectEmit(true, true, true, true);
-        emit PoolConfigured(poolId, STETH, 350, 100);
+        emit YieldSyncHook.PoolConfigured(poolId, STETH, 350, 100);
         
         hook.setPoolConfig(poolId, STETH, 350, 100);
     }

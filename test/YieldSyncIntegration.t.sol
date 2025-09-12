@@ -13,6 +13,10 @@ import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/types/Currency.sol";
+import {IAVSDirectory} from "@eigenlayer/contracts/interfaces/IAVSDirectory.sol";
+import {IStakeRegistry} from "@eigenlayer-middleware/interfaces/IStakeRegistry.sol";
+import {IPermissionController} from "@eigenlayer/contracts/interfaces/IPermissionController.sol";
+import {IHooks} from "@uniswap/v4-core/interfaces/IHooks.sol";
 
 /**
  * @title YieldSyncIntegrationTest

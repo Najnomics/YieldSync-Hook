@@ -41,7 +41,7 @@ contract YieldSyncServiceManager is ServiceManagerBase {
         ISlashingRegistryCoordinator _registryCoordinator,
         IStakeRegistry _stakeRegistry,
         address rewards_coordinator,
-        IAllocationManager allocationManager,
+        IAllocationManager _allocationManager,
         IPermissionController _permissionController,
         IYieldSyncTaskManager _yieldSyncTaskManager
     )
@@ -51,7 +51,7 @@ contract YieldSyncServiceManager is ServiceManagerBase {
             _registryCoordinator,
             _stakeRegistry,
             _permissionController,
-            allocationManager
+            _allocationManager
         )
     {
         yieldSyncTaskManager = _yieldSyncTaskManager;
@@ -59,5 +59,30 @@ contract YieldSyncServiceManager is ServiceManagerBase {
 
     function initialize(address initialOwner, address rewardsInitiator) external initializer {
         __ServiceManagerBase_init(initialOwner, rewardsInitiator);
+    }
+
+    /// @notice Returns the registry coordinator
+    function registryCoordinator() external view returns (ISlashingRegistryCoordinator) {
+        return _registryCoordinator;
+    }
+
+    /// @notice Returns the stake registry
+    function stakeRegistry() external view returns (IStakeRegistry) {
+        return _stakeRegistry;
+    }
+
+    /// @notice Returns the rewards coordinator
+    function rewardsCoordinator() external view returns (IRewardsCoordinator) {
+        return _rewardsCoordinator;
+    }
+
+    /// @notice Returns the allocation manager
+    function allocationManager() external view returns (IAllocationManager) {
+        return _allocationManager;
+    }
+
+    /// @notice Returns the permission controller
+    function permissionController() external view returns (IPermissionController) {
+        return _permissionController;
     }
 }

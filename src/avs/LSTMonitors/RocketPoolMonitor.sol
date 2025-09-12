@@ -16,7 +16,7 @@ contract RocketPoolMonitor is ILSTYieldMonitor, Ownable, ReentrancyGuard {
     address public constant RETH = 0xae78736Cd615f374D3085123A210448E74Fc6393;
     
     /// @notice Rocket Pool Oracle contract address
-    address public constant ROCKET_POOL_ORACLE = 0x4c5D8B3A4B0B0B0B0B0B0B0B0B0B0B0B0B0B0B0B; // Placeholder
+    address public constant ROCKET_POOL_ORACLE = 0x4c5d8B3A4b0b0B0b0b0B0b0b0b0b0b0B0B0B0B0b; // Placeholder
     
     /// @notice Yield data structure
     struct YieldData {
@@ -209,5 +209,19 @@ contract RocketPoolMonitor is ILSTYieldMonitor, Ownable, ReentrancyGuard {
         
         YieldData memory data = yieldHistory[dataId];
         return block.timestamp - data.lastUpdateTime > 3600; // 1 hour threshold
+    }
+
+    /**
+     * @notice Returns the name of this LST monitor
+     */
+    function name() external pure returns (string memory) {
+        return "Rocket Pool rETH";
+    }
+
+    /**
+     * @notice Returns the LST token address
+     */
+    function lstToken() external pure returns (address) {
+        return RETH;
     }
 }

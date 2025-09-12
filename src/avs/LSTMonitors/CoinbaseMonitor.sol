@@ -16,7 +16,7 @@ contract CoinbaseMonitor is ILSTYieldMonitor, Ownable, ReentrancyGuard {
     address public constant CBETH = 0xBe9895146f7AF43049ca1c1AE358B0541Ea49704;
     
     /// @notice Coinbase Oracle contract address
-    address public constant COINBASE_ORACLE = 0x5E5E5E5E5E5E5E5E5E5E5E5E5E5E5E5E5E5E5E5E; // Placeholder
+    address public constant COINBASE_ORACLE = 0x5e5E5e5e5E5e5E5E5e5E5E5e5e5E5E5E5e5E5E5e; // Placeholder
     
     /// @notice Yield data structure
     struct YieldData {
@@ -224,5 +224,19 @@ contract CoinbaseMonitor is ILSTYieldMonitor, Ownable, ReentrancyGuard {
         
         YieldData memory data = yieldHistory[dataId];
         return block.timestamp - data.lastUpdateTime > 3600; // 1 hour threshold
+    }
+
+    /**
+     * @notice Returns the name of this LST monitor
+     */
+    function name() external pure returns (string memory) {
+        return "Coinbase cbETH";
+    }
+
+    /**
+     * @notice Returns the LST token address
+     */
+    function lstToken() external pure returns (address) {
+        return CBETH;
     }
 }

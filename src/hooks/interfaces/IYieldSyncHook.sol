@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {PoolId} from "@uniswap/v4-core/types/PoolId.sol";
+import {PositionAdjustment} from "../libraries/PositionAdjustment.sol";
 
 /**
  * @title IYieldSyncHook
@@ -17,18 +18,6 @@ interface IYieldSyncHook {
         bool autoAdjustmentEnabled;          // Pool-level auto-adjustment setting
     }
 
-    /// @notice Position data structure
-    struct PositionData {
-        address owner;
-        PoolId poolId;
-        int24 tickLower;
-        int24 tickUpper;
-        uint128 liquidity;
-        address lstToken;                    // Which LST is in this position
-        uint256 lastYieldAdjustment;         // Timestamp of last adjustment
-        uint256 accumulatedYieldBPS;         // Total yield accumulated
-        bool autoAdjustEnabled;              // Whether auto-adjustment is enabled
-    }
 
     /// @notice Events
     event PositionRegistered(
@@ -59,7 +48,7 @@ interface IYieldSyncHook {
     );
 
     /// @notice Functions
-    function positions(bytes32 positionId) external view returns (PositionData memory);
+    function positions(bytes32 positionId) external view returns (PositionAdjustment.PositionData memory);
     function poolConfigs(PoolId poolId) external view returns (LSTConfig memory);
     function totalILPrevented(address user) external view returns (uint256);
     function manuallyAdjustPosition(bytes32 positionId) external;

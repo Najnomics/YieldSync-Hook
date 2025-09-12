@@ -16,7 +16,7 @@ contract FraxMonitor is ILSTYieldMonitor, Ownable, ReentrancyGuard {
     address public constant SFRXETH = 0xac3E018457B222d93114458476f3E3416Abbe38F;
     
     /// @notice Frax Oracle contract address
-    address public constant FRAX_ORACLE = 0x6E5E5E5E5E5E5E5E5E5E5E5E5E5E5E5E5E5E5E5E; // Placeholder
+    address public constant FRAX_ORACLE = 0x6E5e5e5e5e5e5e5E5E5e5e5e5e5e5e5e5e5e5e5E; // Placeholder
     
     /// @notice Yield data structure
     struct YieldData {
@@ -224,5 +224,19 @@ contract FraxMonitor is ILSTYieldMonitor, Ownable, ReentrancyGuard {
         
         YieldData memory data = yieldHistory[dataId];
         return block.timestamp - data.lastUpdateTime > 3600; // 1 hour threshold
+    }
+
+    /**
+     * @notice Returns the name of this LST monitor
+     */
+    function name() external pure returns (string memory) {
+        return "Frax sfrxETH";
+    }
+
+    /**
+     * @notice Returns the LST token address
+     */
+    function lstToken() external pure returns (address) {
+        return SFRXETH;
     }
 }

@@ -2,27 +2,29 @@ package aggregator
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/Layr-Labs/eigensdk-go/chainio/clients"
-	sdkclients "github.com/Layr-Labs/eigensdk-go/chainio/clients"
+	"github.com/Layr-Labs/eigensdk-go/chainio/clients/eth"
+	sdkcontracts "github.com/Layr-Labs/eigensdk-go/chainio/clients/elcontracts"
+	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	sdklogging "github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/services/avsregistry"
 	blsagg "github.com/Layr-Labs/eigensdk-go/services/bls_aggregation"
 	"github.com/Layr-Labs/eigensdk-go/services/operatorsinfo"
-	oprsinfoserv "github.com/Layr-Labs/eigensdk-go/services/operatorsinfo"
 	sdktypes "github.com/Layr-Labs/eigensdk-go/types"
-	"github.com/YieldSync/yieldsync-operator/aggregator/types"
-	"github.com/YieldSync/yieldsync-operator/core"
-	"github.com/YieldSync/yieldsync-operator/core/chainio"
-	"github.com/YieldSync/yieldsync-operator/core/config"
 
-	yieldsynctaskmanager "github.com/YieldSync/yieldsync-operator/contracts/bindings/YieldSyncTaskManager"
+	"github.com/YieldSync/yieldsync-hook/avs/aggregator/types"
+	"github.com/YieldSync/yieldsync-hook/avs/core"
+	"github.com/YieldSync/yieldsync-hook/avs/metrics"
 )
 
 const (
@@ -34,142 +36,173 @@ const (
 	avsName                  = "yieldsync"
 )
 
-// Aggregator sends tasks (LST yield monitoring) onchain, then listens for operator signed TaskResponses.
-// It aggregates responses signatures, and if any of the TaskResponses reaches the QuorumThresholdPercentage for each
-// quorum (currently we only use a single quorum of the ERC20Mock token), it sends the aggregated TaskResponse and
-// signature onchain.
-//
-// The signature is checked in the BLSSignatureChecker.sol contract, which expects a
-//
-//	struct NonSignerStakesAndSignature {
-//		uint32[] nonSignerQuorumBitmapIndices;
-//		BN254.G1Point[] nonSignerPubkeys;
-//		BN254.G1Point[] quorumApks;
-//		BN254.G2Point apkG2;
-//		BN254.G1Point sigma;
-//		uint32[] quorumApkIndices;
-//		uint32[] quorumThresholdPercentages;
-//		uint32[] quorumApkIndices;
-//		uint32[] quorumThresholdPercentages;
-//	}
+// Aggregator is the core component that manages task creation and response aggregation
+// It handles:
+// - Creating new LST yield monitoring tasks
+// - Collecting signed responses from operators  
+// - Aggregating BLS signatures when quorum is reached
+// - Submitting aggregated responses to the TaskManager contract
 type Aggregator struct {
-	config    config.Config
-	logger    logging.Logger
-	ethClient chainio.EthClientInterface
+	config    core.NodeConfig
+	logger    sdklogging.Logger
+	ethClient eth.Client
 
 	// EigenLayer clients
-	elClients  *clients.Clients
-	elContracts *sdkclients.Clients
-
-	// YieldSync contracts
-	yieldSyncContracts *chainio.YieldSyncContracts
+	elClients       *clients.Clients
+	elContracts     *sdkcontracts.Clients
+	avsReader       core.AvsReaderer
+	avsWriter       core.AvsWriter
+	avsSubscriber   core.AvsSubscriberer
 
 	// BLS aggregation service
 	blsAggregationService blsagg.BlsAggregationService
+	operatorsInfoService  operatorsinfo.OperatorsInfoService
+	avsRegistryService    avsregistry.AvsRegistryService
 
-	// Operators info service
-	operatorsInfoService operatorsinfo.OperatorsInfoService
+	// Task and response management
+	taskMutex           sync.RWMutex
+	pendingTasks        map[uint32]*types.TaskInfo
+	taskResponses       map[uint32]map[sdktypes.OperatorId]*types.SignedTaskResponse
+	quorumThreshold     map[uint8]sdktypes.ThresholdPercentage
 
-	// AVS registry service
-	avsRegistryService avsregistry.AvsRegistryService
+	// Metrics
+	metricsRegistry *prometheus.Registry
+	metrics         *metrics.AggregatorMetrics
 
-	// Task tracking
-	latestTaskNum   uint32
-	taskCreatedChan chan yieldsynctaskmanager.ContractYieldSyncTaskManagerNewTaskCreated
-
-	// RPC server for operator communication
-	rpcServer *chainio.RPCServer
+	// HTTP server for operator communication
+	httpServerIpPortAddr string
 
 	// Context and cancellation
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
-// NewAggregator creates a new aggregator
-func NewAggregator(config config.Config) (*Aggregator, error) {
+// NewAggregatorFromConfig creates a new aggregator from configuration
+func NewAggregatorFromConfig(config core.NodeConfig) (*Aggregator, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Setup logger
-	logger := config.Logger
+	logger, err := sdklogging.NewZapLogger(config.Logger.Level)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
 
 	// Setup Ethereum client
-	ethClient := config.EthHttpClient
+	ethClient, err := eth.NewClient(config.EthRpcUrl, config.EthWsUrl)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create eth client: %w", err)
+	}
 
 	// Setup EigenLayer clients
 	elClients, err := clients.NewClients(
-		config.EthHttpRpcUrl,
-		config.EthWsRpcUrl,
-		config.AggregatorAddress,
-		&ethClient,
+		config.EthRpcUrl,
+		config.EthWsUrl,
+		common.HexToAddress(config.Aggregator.AggregatorAddress),
+		ethClient,
 	)
 	if err != nil {
 		cancel()
-		return nil, err
+		return nil, fmt.Errorf("failed to create eigenlayer clients: %w", err)
 	}
 
 	// Setup EigenLayer contracts
-	elContracts, err := sdkclients.NewClients(
-		config.IncredibleSquaringServiceManager,
-		config.DelegationManagerAddr,
-		config.TokenStrategyAddr,
-		config.AggregatorAddress,
+	elContracts, err := sdkcontracts.NewClients(
+		common.HexToAddress(config.EigenLayer.ServiceManagerAddr),
+		common.HexToAddress(config.EigenLayer.DelegationManagerAddr),
+		common.HexToAddress(config.EigenLayer.StrategyManagerAddr),
+		common.HexToAddress(config.EigenLayer.AVSDirectoryAddress),
 		elClients,
 	)
 	if err != nil {
 		cancel()
-		return nil, err
+		return nil, fmt.Errorf("failed to create eigenlayer contracts: %w", err)
 	}
 
-	// Setup YieldSync contracts
-	yieldSyncContracts, err := chainio.NewYieldSyncContracts(
-		config.IncredibleSquaringServiceManager,
-		config.IncredibleSquaringRegistryCoordinatorAddr,
-		&ethClient,
+	// Setup AVS reader, writer, and subscriber
+	avsReader, err := core.NewAvsReader(
+		common.HexToAddress(config.EigenLayer.ServiceManagerAddr),
+		common.HexToAddress(config.EigenLayer.TaskManagerAddr),
+		ethClient,
+		logger,
 	)
 	if err != nil {
 		cancel()
-		return nil, err
+		return nil, fmt.Errorf("failed to create avs reader: %w", err)
+	}
+
+	avsWriter, err := core.NewAvsWriter(
+		common.HexToAddress(config.EigenLayer.ServiceManagerAddr),
+		common.HexToAddress(config.EigenLayer.TaskManagerAddr),
+		common.HexToAddress(config.Aggregator.AggregatorAddress),
+		ethClient,
+		logger,
+	)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create avs writer: %w", err)
+	}
+
+	avsSubscriber, err := core.NewAvsSubscriber(
+		common.HexToAddress(config.EigenLayer.ServiceManagerAddr),
+		common.HexToAddress(config.EigenLayer.TaskManagerAddr),
+		ethClient,
+		logger,
+	)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create avs subscriber: %w", err)
 	}
 
 	// Setup BLS aggregation service
 	blsAggregationService := blsagg.NewBlsAggregationService(
-		elClients,
+		elClients.AvsRegistryCoordinator,
 		logger,
 	)
 
 	// Setup operators info service
-	operatorsInfoService := oprsinfoserv.NewOperatorsInfoServiceInMemory(
-		elClients,
+	operatorsInfoService := operatorsinfo.NewOperatorsInfoServiceInMemory(
+		context.Background(),
+		elClients.AvsRegistryCoordinator,
+		elClients.OperatorStateRetriever,
 		logger,
 	)
 
 	// Setup AVS registry service
 	avsRegistryService := avsregistry.NewAvsRegistryService(
-		elClients,
+		avsReader,
 		logger,
 	)
 
-	// Setup RPC server
-	rpcServer := chainio.NewRPCServer(config.AggregatorServerIpPortAddr, logger)
+	// Setup metrics
+	metricsRegistry := prometheus.NewRegistry()
+	aggregatorMetrics := metrics.NewAggregatorMetrics(metricsRegistry)
 
-	// Setup task tracking
-	taskCreatedChan := make(chan yieldsynctaskmanager.ContractYieldSyncTaskManagerNewTaskCreated, 100)
+	// Initialize quorum thresholds
+	quorumThreshold := make(map[uint8]sdktypes.ThresholdPercentage)
+	quorumThreshold[0] = sdktypes.ThresholdPercentage(config.Aggregator.QuorumThresholdPercentage)
 
 	aggregator := &Aggregator{
-		config:               config,
-		logger:               logger,
-		ethClient:            &ethClient,
-		elClients:            elClients,
-		elContracts:          elContracts,
-		yieldSyncContracts:   yieldSyncContracts,
+		config:                config,
+		logger:                logger,
+		ethClient:             ethClient,
+		elClients:             elClients,
+		elContracts:           elContracts,
+		avsReader:             avsReader,
+		avsWriter:             avsWriter,
+		avsSubscriber:         avsSubscriber,
 		blsAggregationService: blsAggregationService,
 		operatorsInfoService:  operatorsInfoService,
-		avsRegistryService:   avsRegistryService,
-		latestTaskNum:        0,
-		taskCreatedChan:      taskCreatedChan,
-		rpcServer:            rpcServer,
-		ctx:                  ctx,
-		cancel:               cancel,
+		avsRegistryService:    avsRegistryService,
+		pendingTasks:          make(map[uint32]*types.TaskInfo),
+		taskResponses:         make(map[uint32]map[sdktypes.OperatorId]*types.SignedTaskResponse),
+		quorumThreshold:       quorumThreshold,
+		metricsRegistry:       metricsRegistry,
+		metrics:               aggregatorMetrics,
+		httpServerIpPortAddr:  config.Aggregator.ServerIpPortAddr,
+		ctx:                   ctx,
+		cancel:                cancel,
 	}
 
 	return aggregator, nil
@@ -177,16 +210,29 @@ func NewAggregator(config config.Config) (*Aggregator, error) {
 
 // Start starts the aggregator
 func (a *Aggregator) Start(ctx context.Context) error {
-	a.logger.Info("Starting YieldSync Aggregator")
+	a.logger.Info("Starting YieldSync Aggregator", "httpServerIpPortAddr", a.httpServerIpPortAddr)
 
-	// Start RPC server
-	go a.rpcServer.Start(a.ctx)
+	// Start operators info service
+	if err := a.operatorsInfoService.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start operators info service: %w", err)
+	}
 
-	// Start task monitoring
-	go a.monitorTasks()
+	// Start BLS aggregation service
+	if err := a.blsAggregationService.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start bls aggregation service: %w", err)
+	}
 
-	// Start response processing
-	go a.processResponses()
+	// Start HTTP server for operator communication
+	go a.startHttpServer()
+
+	// Start task creation loop
+	go a.taskCreationLoop()
+
+	// Start task response monitoring
+	go a.monitorTaskResponses()
+
+	// Start metrics server
+	go a.startMetricsServer()
 
 	// Wait for context cancellation
 	<-ctx.Done()
