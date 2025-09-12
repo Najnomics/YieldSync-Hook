@@ -88,7 +88,7 @@ library PositionAdjustment {
         uint256 currentYieldBPS,
         uint256 thresholdBPS,
         uint256 cooldownPeriod
-    ) internal view returns (bool needsAdjustment) {
+    ) internal view returns (bool) {
         // Check if yield exceeds threshold
         if (currentYieldBPS < thresholdBPS) {
             return false;

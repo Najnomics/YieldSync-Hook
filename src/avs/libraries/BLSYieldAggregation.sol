@@ -38,7 +38,7 @@ library BLSYieldAggregation {
     function aggregateYieldData(
         YieldSubmission[] memory submissions,
         BLSSignature[] memory signatures
-    ) internal pure returns (AggregatedYieldData memory aggregated) {
+    ) internal view returns (AggregatedYieldData memory aggregated) {
         require(submissions.length == signatures.length, "BLS: length mismatch");
         require(submissions.length > 0, "BLS: no submissions");
         

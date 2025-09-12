@@ -120,7 +120,7 @@ library LSTDetection {
     /// @param token0 First token address
     /// @param token1 Second token address
     /// @return isLSTPair Whether this is an LST-related pair
-    function isLSTPair(address token0, address token1) internal pure returns (bool isLSTPair) {
+    function isLSTPair(address token0, address token1) internal pure returns (bool) {
         return _isLST(token0) || _isLST(token1);
     }
 

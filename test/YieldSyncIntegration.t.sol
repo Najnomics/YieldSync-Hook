@@ -115,7 +115,7 @@ contract YieldSyncIntegrationTest is Test {
     
     function testPositionRegistration() public {
         // Test position registration
-        bytes32 positionId = keccak256(abi.encodePacked(user, 1, -60, 60));
+        bytes32 positionId = keccak256(abi.encodePacked(user, uint256(1), int24(-60), int24(60)));
         
         // This would test position registration
         // In a real test, you'd call the hook's afterAddLiquidity function
@@ -124,7 +124,7 @@ contract YieldSyncIntegrationTest is Test {
     
     function testYieldAdjustment() public {
         // Test yield adjustment
-        bytes32 positionId = keccak256(abi.encodePacked(user, 1, -60, 60));
+        bytes32 positionId = keccak256(abi.encodePacked(user, uint256(1), int24(-60), int24(60)));
         
         // This would test yield adjustment
         // In a real test, you'd call the hook's manuallyAdjustPosition function
