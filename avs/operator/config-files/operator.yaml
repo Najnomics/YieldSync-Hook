@@ -1,0 +1,79 @@
+# YieldSync Operator Configuration
+# This configuration file defines all the settings for the YieldSync operator
+
+# EigenLayer configuration
+eigenlayer:
+  ecdsa_private_key_store_path: "./keys/ecdsa_private_key.json"
+  bls_private_key_store_path: "./keys/bls_private_key.json"
+  operator_address: "0x1234567890123456789012345678901234567890"
+  avs_directory_address: "0x1234567890123456789012345678901234567890"
+  token_strategy_addr: "0x1234567890123456789012345678901234567890"
+  delegation_manager_addr: "0x1234567890123456789012345678901234567890"
+  strategy_manager_addr: "0x1234567890123456789012345678901234567890"
+  service_manager_addr: "0x1234567890123456789012345678901234567890"
+  task_manager_addr: "0x1234567890123456789012345678901234567890"
+  slashing_registry_coordinator_addr: "0x1234567890123456789012345678901234567890"
+  stake_registry_addr: "0x1234567890123456789012345678901234567890"
+  bls_apk_registry_addr: "0x1234567890123456789012345678901234567890"
+  index_registry_addr: "0x1234567890123456789012345678901234567890"
+  bls_apk_registry_coordinator_addr: "0x1234567890123456789012345678901234567890"
+  registry_coordinator_addr: "0x1234567890123456789012345678901234567890"
+  pubkey_compendium_addr: "0x1234567890123456789012345678901234567890"
+  avs_registry_coordinator_addr: "0x1234567890123456789012345678901234567890"
+  rewards_coordinator_addr: "0x1234567890123456789012345678901234567890"
+  allocation_manager_addr: "0x1234567890123456789012345678901234567890"
+
+# Ethereum configuration
+eth_rpc_url: "https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY"
+eth_ws_url: "wss://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY"
+private_key: "0x1234567890123456789012345678901234567890123456789012345678901234"
+address: "0x1234567890123456789012345678901234567890"
+
+# Chain configuration
+chain_id: 1
+
+# Operator configuration
+operator:
+  enable_metrics: true
+  metrics_ip_port_addr: "0.0.0.0:8080"
+  enable_node_api: true
+  node_api_ip_port_addr: "0.0.0.0:8081"
+  enable_lst_monitoring: true
+  yieldsync_avs_addr: "0x1234567890123456789012345678901234567890"
+  yieldsync_task_manager_addr: "0x1234567890123456789012345678901234567890"
+
+# LST monitoring configuration
+lst_monitoring:
+  lido_steth_address: "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84"
+  rocketpool_reth_address: "0xae78736Cd615f374D3085123A210448E74Fc6393"
+  coinbase_cbeth_address: "0xBe9895146f7AF43049ca1c1AE358B0541Ea49704"
+  frax_sfrxeth_address: "0xac3E018457B222d93114458476f3E3416Abbe38F"
+  monitoring_interval: "30s"
+  yield_threshold_bps: 100  # 1% change threshold
+
+# Aggregator configuration
+aggregator:
+  server_ip_port_addr: "http://localhost:8082"
+  enable_metrics: true
+
+# Challenger configuration
+challenger:
+  enable_metrics: true
+  metrics_ip_port_addr: "0.0.0.0:8083"
+
+# Logger configuration
+logger:
+  level: "info"
+  format: "json"
+
+# Database configuration
+database:
+  driver: "sqlite3"
+  source: "./data/operator.db"
+
+# Monitoring configuration
+monitoring:
+  enable_prometheus: true
+  prometheus_port: 9090
+  enable_grafana: true
+  grafana_port: 3000

@@ -1,0 +1,71 @@
+# YieldSync Challenger Configuration
+# This configuration file defines all the settings for the YieldSync challenger
+
+# Environment: 'production' only prints info and above. 'development' also prints debug
+environment: production
+
+# Ethereum configuration
+eth_rpc_url: "https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY"
+eth_ws_url: "wss://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY"
+private_key: "0x1234567890123456789012345678901234567890123456789012345678901234"
+address: "0x1234567890123456789012345678901234567890"
+
+# Chain configuration
+chain_id: 1
+
+# Challenger configuration
+challenger:
+  enable_metrics: true
+  metrics_ip_port_addr: "localhost:9090"
+  enable_node_api: true
+  node_api_ip_port_addr: "localhost:9091"
+
+# EigenLayer configuration
+eigenlayer:
+  delegation_manager_address: "0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A"
+  service_manager_address: "0x1234567890123456789012345678901234567890"
+  task_manager_address: "0x1234567890123456789012345678901234567890"
+  registry_coordinator_address: "0x1234567890123456789012345678901234567890"
+  operator_state_retriever_address: "0x1234567890123456789012345678901234567890"
+  rewards_coordinator_address: "0x1234567890123456789012345678901234567890"
+  allocation_manager_address: "0x1234567890123456789012345678901234567890"
+
+# LST monitoring configuration
+lst_monitoring:
+  lido_steth_address: "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84"
+  rocketpool_reth_address: "0xae78736Cd615f374D3085123A210448E74Fc6393"
+  coinbase_cbeth_address: "0xBe9895146f7AF43049ca1c1AE358B0541Ea49704"
+  frax_sfrxeth_address: "0xac3E018457B222d93114458476f3E3416Abbe38F"
+  monitoring_interval: "30s"
+  yield_threshold_bps: 10  # 0.1% tolerance
+
+# Logger configuration
+logger:
+  level: "info"
+  format: "json"
+
+# Database configuration
+database:
+  driver: "sqlite3"
+  source: "./data/challenger.db"
+
+# Monitoring configuration
+monitoring:
+  enable_prometheus: true
+  prometheus_port: 9090
+  enable_grafana: true
+  grafana_port: 3000
+
+# Challenge configuration
+challenge:
+  verification_interval: "10s"
+  challenge_window_blocks: 100
+  max_challenges_per_block: 5
+  yield_tolerance_bps: 10  # 0.1% tolerance
+
+# Verification configuration
+verification:
+  max_retries: 3
+  retry_delay: "5s"
+  timeout: "30s"
+  confidence_threshold: 0.95

@@ -208,7 +208,7 @@ yieldsync-hook/
 │       ├── v4-core/                        # Uniswap V4 core
 │       └── v4-periphery/                   # Uniswap V4 periphery
 │
-├── operator/                               # Go-based AVS operator
+├── AVS/                               # Go-based AVS operator
 │   ├── cmd/
 │   │   └── main.go                         # Operator entry point
 │   ├── pkg/

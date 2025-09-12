@@ -1,0 +1,7 @@
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+@uniswap/v4-core/=lib/v4-periphery/lib/v4-core/src/
+v4-periphery/=lib/v4-periphery/
+forge-std/=lib/forge-std/src/
+@eigenlayer-middleware/=lib/eigenlayer-middleware/src/
+@eigenlayer/contracts/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/
+@openzeppelin-upgrades/=lib/eigenlayer-middleware/lib/openzeppelin-contracts-upgradeable/
