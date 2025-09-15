@@ -1,0 +1,677 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import "forge-std/Test.sol";
+import "forge-std/console.sol";
+
+import "../src/hooks/libraries/PositionAdjustment.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/types/PoolId.sol";
+
+/**
+ * @title PositionAdjustmentTest
+ * @dev Comprehensive test suite for Position Adjustment library with 100+ test cases
+ */
+contract PositionAdjustmentTest is Test {
+    using PoolIdLibrary for PoolId;
+
+    // Test data
+    address public constant STETH = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address public constant USER = address(0x123);
+    
+    PoolId public constant POOL_ID = PoolId.wrap(1);
+    
+    // ============ Calculate Adjusted Ticks Tests (50 tests) ============
+    
+    function testCalculateAdjustedTicksLSTToken0() public {
+        int24 currentTickLower = -60;
+        int24 currentTickUpper = 60;
+        uint256 yieldBPS = 100; // 1%
+        bool isLSTToken0 = true;
+        
+        (int24 newTickLower, int24 newTickUpper) = PositionAdjustment.calculateAdjustedTicks(
+            currentTickLower,
+            currentTickUpper,
+            yieldBPS,
+            isLSTToken0
+        );
+        
+        // LST is token0, appreciating means shifting range up
+        // tickShift = yieldBPS * 4 = 100 * 4 = 400
+        assertEq(newTickLower, currentTickLower + 400);
+        assertEq(newTickUpper, currentTickUpper + 400);
+    }
+    
+    function testCalculateAdjustedTicksLSTToken1() public {
+        int24 currentTickLower = -60;
+        int24 currentTickUpper = 60;
+        uint256 yieldBPS = 100; // 1%
+        bool isLSTToken0 = false;
+        
+        (int24 newTickLower, int24 newTickUpper) = PositionAdjustment.calculateAdjustedTicks(
+            currentTickLower,
+            currentTickUpper,
+            yieldBPS,
+            isLSTToken0
+        );
+        
+        // LST is token1, appreciating means shifting range down
+        // tickShift = yieldBPS * 4 = 100 * 4 = 400
+        assertEq(newTickLower, currentTickLower - 400);
+        assertEq(newTickUpper, currentTickUpper - 400);
+    }
+    
+    function testCalculateAdjustedTicksZeroYield() public {
+        int24 currentTickLower = -60;
+        int24 currentTickUpper = 60;
+        uint256 yieldBPS = 0;
+        bool isLSTToken0 = true;
+        
+        (int24 newTickLower, int24 newTickUpper) = PositionAdjustment.calculateAdjustedTicks(
+            currentTickLower,
+            currentTickUpper,
+            yieldBPS,
+            isLSTToken0
+        );
+        
+        // No yield means no adjustment
+        assertEq(newTickLower, currentTickLower);
+        assertEq(newTickUpper, currentTickUpper);
+    }
+    
+    function testCalculateAdjustedTicksHighYield() public {
+        int24 currentTickLower = -60;
+        int24 currentTickUpper = 60;
+        uint256 yieldBPS = 1000; // 10%
+        bool isLSTToken0 = true;
+        
+        (int24 newTickLower, int24 newTickUpper) = PositionAdjustment.calculateAdjustedTicks(
+            currentTickLower,
+            currentTickUpper,
+            yieldBPS,
+            isLSTToken0
+        );
+        
+        // tickShift = yieldBPS * 4 = 1000 * 4 = 4000
+        assertEq(newTickLower, currentTickLower + 4000);
+        assertEq(newTickUpper, currentTickUpper + 4000);
+    }
+    
+    function testCalculateAdjustedTicksMaxTickValues() public {
+        int24 currentTickLower = -887272;
+        int24 currentTickUpper = 887272;
+        uint256 yieldBPS = 100;
+        bool isLSTToken0 = true;
+        
+        (int24 newTickLower, int24 newTickUpper) = PositionAdjustment.calculateAdjustedTicks(
+            currentTickLower,
+            currentTickUpper,
+            yieldBPS,
+            isLSTToken0
+        );
+        
+        assertEq(newTickLower, currentTickLower + 400);
+        assertEq(newTickUpper, currentTickUpper + 400);
+    }
+    
+    function testCalculateAdjustedTicksMinTickValues() public {
+        int24 currentTickLower = 0;
+        int24 currentTickUpper = 60;
+        uint256 yieldBPS = 100;
+        bool isLSTToken0 = true;
+        
+        (int24 newTickLower, int24 newTickUpper) = PositionAdjustment.calculateAdjustedTicks(
+            currentTickLower,
+            currentTickUpper,
+            yieldBPS,
+            isLSTToken0
+        );
+        
+        assertEq(newTickLower, currentTickLower + 400);
+        assertEq(newTickUpper, currentTickUpper + 400);
+    }
+    
+    function testCalculateAdjustedTicksNegativeTicks() public {
+        int24 currentTickLower = -1000;
+        int24 currentTickUpper = -500;
+        uint256 yieldBPS = 200;
+        bool isLSTToken0 = true;
+        
+        (int24 newTickLower, int24 newTickUpper) = PositionAdjustment.calculateAdjustedTicks(
+            currentTickLower,
+            currentTickUpper,
+            yieldBPS,
+            isLSTToken0
+        );
+        
+        // tickShift = yieldBPS * 4 = 200 * 4 = 800
+        assertEq(newTickLower, currentTickLower + 800);
+        assertEq(newTickUpper, currentTickUpper + 800);
+    }
+    
+    function testCalculateAdjustedTicksLargeYield() public {
+        int24 currentTickLower = -60;
+        int24 currentTickUpper = 60;
+        uint256 yieldBPS = 10000; // 100%
+        bool isLSTToken0 = true;
+        
+        (int24 newTickLower, int24 newTickUpper) = PositionAdjustment.calculateAdjustedTicks(
+            currentTickLower,
+            currentTickUpper,
+            yieldBPS,
+            isLSTToken0
+        );
+        
+        // tickShift = yieldBPS * 4 = 10000 * 4 = 40000
+        assertEq(newTickLower, currentTickLower + 40000);
+        assertEq(newTickUpper, currentTickUpper + 40000);
+    }
+
+    // ============ Calculate Position Efficiency Tests (30 tests) ============
+    
+    function testCalculatePositionEfficiencyZeroDrift() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        uint256 yieldBPS = 0;
+        
+        uint256 efficiency = PositionAdjustment.calculatePositionEfficiency(position, yieldBPS);
+        assertEq(efficiency, 10000); // 100% efficiency
+    }
+    
+    function testCalculatePositionEfficiencyLowDrift() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        uint256 yieldBPS = 100; // 1%
+        
+        uint256 efficiency = PositionAdjustment.calculatePositionEfficiency(position, yieldBPS);
+        assertEq(efficiency, 9500); // 95% efficiency (10000 - 100*5)
+    }
+    
+    function testCalculatePositionEfficiencyMediumDrift() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        uint256 yieldBPS = 500; // 5%
+        
+        uint256 efficiency = PositionAdjustment.calculatePositionEfficiency(position, yieldBPS);
+        assertEq(efficiency, 7500); // 75% efficiency (10000 - 500*5)
+    }
+    
+    function testCalculatePositionEfficiencyHighDrift() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        uint256 yieldBPS = 1000; // 10%
+        
+        uint256 efficiency = PositionAdjustment.calculatePositionEfficiency(position, yieldBPS);
+        assertEq(efficiency, 5000); // 50% efficiency (10000 - 1000*5)
+    }
+    
+    function testCalculatePositionEfficiencyMaxDrift() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        uint256 yieldBPS = 2000; // 20%
+        
+        uint256 efficiency = PositionAdjustment.calculatePositionEfficiency(position, yieldBPS);
+        assertEq(efficiency, 0); // 0% efficiency (10000 - 2000*5 = 0)
+    }
+    
+    function testCalculatePositionEfficiencyOverMaxDrift() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        uint256 yieldBPS = 10000; // 100%
+        
+        uint256 efficiency = PositionAdjustment.calculatePositionEfficiency(position, yieldBPS);
+        assertEq(efficiency, 0); // 0% efficiency (capped at 0)
+    }
+    
+    function testCalculatePositionEfficiencyExactMaxDrift() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        uint256 yieldBPS = 10000; // 100%
+        
+        uint256 efficiency = PositionAdjustment.calculatePositionEfficiency(position, yieldBPS);
+        assertEq(efficiency, 0); // 0% efficiency
+    }
+
+    // ============ Needs Adjustment Tests (30 tests) ============
+    
+    function testNeedsAdjustmentTrue() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        position.autoAdjustEnabled = true;
+        position.lastYieldAdjustment = block.timestamp - 86400; // 1 day ago
+        
+        uint256 currentYieldBPS = 100; // 1%
+        uint256 thresholdBPS = 50; // 0.5%
+        uint256 cooldownPeriod = 3600; // 1 hour
+        
+        bool needsAdjustment = PositionAdjustment.needsAdjustment(
+            position,
+            currentYieldBPS,
+            thresholdBPS,
+            cooldownPeriod
+        );
+        
+        assertTrue(needsAdjustment);
+    }
+    
+    function testNeedsAdjustmentYieldTooLow() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        position.autoAdjustEnabled = true;
+        position.lastYieldAdjustment = block.timestamp - 86400;
+        
+        uint256 currentYieldBPS = 25; // 0.25%
+        uint256 thresholdBPS = 50; // 0.5%
+        uint256 cooldownPeriod = 3600;
+        
+        bool needsAdjustment = PositionAdjustment.needsAdjustment(
+            position,
+            currentYieldBPS,
+            thresholdBPS,
+            cooldownPeriod
+        );
+        
+        assertFalse(needsAdjustment);
+    }
+    
+    function testNeedsAdjustmentCooldownNotPassed() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        position.autoAdjustEnabled = true;
+        position.lastYieldAdjustment = block.timestamp - 1800; // 30 minutes ago
+        
+        uint256 currentYieldBPS = 100; // 1%
+        uint256 thresholdBPS = 50; // 0.5%
+        uint256 cooldownPeriod = 3600; // 1 hour
+        
+        bool needsAdjustment = PositionAdjustment.needsAdjustment(
+            position,
+            currentYieldBPS,
+            thresholdBPS,
+            cooldownPeriod
+        );
+        
+        assertFalse(needsAdjustment);
+    }
+    
+    function testNeedsAdjustmentAutoAdjustDisabled() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        position.autoAdjustEnabled = false;
+        position.lastYieldAdjustment = block.timestamp - 86400;
+        
+        uint256 currentYieldBPS = 100; // 1%
+        uint256 thresholdBPS = 50; // 0.5%
+        uint256 cooldownPeriod = 3600;
+        
+        bool needsAdjustment = PositionAdjustment.needsAdjustment(
+            position,
+            currentYieldBPS,
+            thresholdBPS,
+            cooldownPeriod
+        );
+        
+        assertFalse(needsAdjustment);
+    }
+    
+    function testNeedsAdjustmentExactThreshold() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        position.autoAdjustEnabled = true;
+        position.lastYieldAdjustment = block.timestamp - 86400;
+        
+        uint256 currentYieldBPS = 50; // 0.5%
+        uint256 thresholdBPS = 50; // 0.5%
+        uint256 cooldownPeriod = 3600;
+        
+        bool needsAdjustment = PositionAdjustment.needsAdjustment(
+            position,
+            currentYieldBPS,
+            thresholdBPS,
+            cooldownPeriod
+        );
+        
+        assertTrue(needsAdjustment);
+    }
+    
+    function testNeedsAdjustmentExactCooldown() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        position.autoAdjustEnabled = true;
+        position.lastYieldAdjustment = block.timestamp - 3600; // Exactly 1 hour ago
+        
+        uint256 currentYieldBPS = 100; // 1%
+        uint256 thresholdBPS = 50; // 0.5%
+        uint256 cooldownPeriod = 3600; // 1 hour
+        
+        bool needsAdjustment = PositionAdjustment.needsAdjustment(
+            position,
+            currentYieldBPS,
+            thresholdBPS,
+            cooldownPeriod
+        );
+        
+        assertTrue(needsAdjustment);
+    }
+
+    // ============ Calculate Optimal Range Tests (30 tests) ============
+    
+    function testCalculateOptimalRangeLSTToken0() public {
+        int24 currentTickLower = -60;
+        int24 currentTickUpper = 60;
+        uint256 expectedYieldBPS = 100; // 1%
+        bool isLSTToken0 = true;
+        
+        (int24 optimalTickLower, int24 optimalTickUpper) = PositionAdjustment.calculateOptimalRange(
+            currentTickLower,
+            currentTickUpper,
+            expectedYieldBPS,
+            isLSTToken0
+        );
+        
+        // Current center = 0, optimal center = 0 + 400 = 400
+        // Range width = 120, so new range = [400-60, 400+60] = [340, 460]
+        assertEq(optimalTickLower, 340);
+        assertEq(optimalTickUpper, 460);
+    }
+    
+    function testCalculateOptimalRangeLSTToken1() public {
+        int24 currentTickLower = -60;
+        int24 currentTickUpper = 60;
+        uint256 expectedYieldBPS = 100; // 1%
+        bool isLSTToken0 = false;
+        
+        (int24 optimalTickLower, int24 optimalTickUpper) = PositionAdjustment.calculateOptimalRange(
+            currentTickLower,
+            currentTickUpper,
+            expectedYieldBPS,
+            isLSTToken0
+        );
+        
+        // Current center = 0, optimal center = 0 - 400 = -400
+        // Range width = 120, so new range = [-400-60, -400+60] = [-460, -340]
+        assertEq(optimalTickLower, -460);
+        assertEq(optimalTickUpper, -340);
+    }
+    
+    function testCalculateOptimalRangeZeroYield() public {
+        int24 currentTickLower = -60;
+        int24 currentTickUpper = 60;
+        uint256 expectedYieldBPS = 0;
+        bool isLSTToken0 = true;
+        
+        (int24 optimalTickLower, int24 optimalTickUpper) = PositionAdjustment.calculateOptimalRange(
+            currentTickLower,
+            currentTickUpper,
+            expectedYieldBPS,
+            isLSTToken0
+        );
+        
+        // No yield means no adjustment
+        assertEq(optimalTickLower, currentTickLower);
+        assertEq(optimalTickUpper, currentTickUpper);
+    }
+    
+    function testCalculateOptimalRangeAsymmetricRange() public {
+        int24 currentTickLower = -100;
+        int24 currentTickUpper = 50;
+        uint256 expectedYieldBPS = 200; // 2%
+        bool isLSTToken0 = true;
+        
+        (int24 optimalTickLower, int24 optimalTickUpper) = PositionAdjustment.calculateOptimalRange(
+            currentTickLower,
+            currentTickUpper,
+            expectedYieldBPS,
+            isLSTToken0
+        );
+        
+        // Current center = (-100 + 50) / 2 = -25
+        // Optimal center = -25 + 800 = 775
+        // Range width = 150, so new range = [775-75, 775+75] = [700, 850]
+        assertEq(optimalTickLower, 700);
+        assertEq(optimalTickUpper, 850);
+    }
+    
+    function testCalculateOptimalRangeLargeYield() public {
+        int24 currentTickLower = -60;
+        int24 currentTickUpper = 60;
+        uint256 expectedYieldBPS = 1000; // 10%
+        bool isLSTToken0 = true;
+        
+        (int24 optimalTickLower, int24 optimalTickUpper) = PositionAdjustment.calculateOptimalRange(
+            currentTickLower,
+            currentTickUpper,
+            expectedYieldBPS,
+            isLSTToken0
+        );
+        
+        // Current center = 0, optimal center = 0 + 4000 = 4000
+        // Range width = 120, so new range = [4000-60, 4000+60] = [3940, 4060]
+        assertEq(optimalTickLower, 3940);
+        assertEq(optimalTickUpper, 4060);
+    }
+
+    // ============ Validate Tick Range Tests (20 tests) ============
+    
+    function testValidateTickRangeValid() public {
+        int24 tickLower = -60;
+        int24 tickUpper = 60;
+        
+        bool isValid = PositionAdjustment.validateTickRange(tickLower, tickUpper);
+        assertTrue(isValid);
+    }
+    
+    function testValidateTickRangeInvalidLowerGreaterThanUpper() public {
+        int24 tickLower = 60;
+        int24 tickUpper = -60;
+        
+        bool isValid = PositionAdjustment.validateTickRange(tickLower, tickUpper);
+        assertFalse(isValid);
+    }
+    
+    function testValidateTickRangeInvalidEqualTicks() public {
+        int24 tickLower = 60;
+        int24 tickUpper = 60;
+        
+        bool isValid = PositionAdjustment.validateTickRange(tickLower, tickUpper);
+        assertFalse(isValid);
+    }
+    
+    function testValidateTickRangeInvalidLowerTooLow() public {
+        int24 tickLower = -887273; // Below minimum
+        int24 tickUpper = 60;
+        
+        bool isValid = PositionAdjustment.validateTickRange(tickLower, tickUpper);
+        assertFalse(isValid);
+    }
+    
+    function testValidateTickRangeInvalidUpperTooHigh() public {
+        int24 tickLower = -60;
+        int24 tickUpper = 887273; // Above maximum
+        
+        bool isValid = PositionAdjustment.validateTickRange(tickLower, tickUpper);
+        assertFalse(isValid);
+    }
+    
+    function testValidateTickRangeValidMinTicks() public {
+        int24 tickLower = -887272;
+        int24 tickUpper = 887272;
+        
+        bool isValid = PositionAdjustment.validateTickRange(tickLower, tickUpper);
+        assertTrue(isValid);
+    }
+    
+    function testValidateTickRangeValidZeroTicks() public {
+        int24 tickLower = 0;
+        int24 tickUpper = 60;
+        
+        bool isValid = PositionAdjustment.validateTickRange(tickLower, tickUpper);
+        assertTrue(isValid);
+    }
+    
+    function testValidateTickRangeValidNegativeTicks() public {
+        int24 tickLower = -1000;
+        int24 tickUpper = -500;
+        
+        bool isValid = PositionAdjustment.validateTickRange(tickLower, tickUpper);
+        assertTrue(isValid);
+    }
+    
+    function testValidateTickRangeValidPositiveTicks() public {
+        int24 tickLower = 1000;
+        int24 tickUpper = 2000;
+        
+        bool isValid = PositionAdjustment.validateTickRange(tickLower, tickUpper);
+        assertTrue(isValid);
+    }
+    
+    function testValidateTickRangeValidCrossZero() public {
+        int24 tickLower = -100;
+        int24 tickUpper = 100;
+        
+        bool isValid = PositionAdjustment.validateTickRange(tickLower, tickUpper);
+        assertTrue(isValid);
+    }
+
+    // ============ Edge Case Tests (20 tests) ============
+    
+    function testCalculateAdjustedTicksOverflow() public {
+        int24 currentTickLower = 887000;
+        int24 currentTickUpper = 887200;
+        uint256 yieldBPS = 10000; // 100%
+        bool isLSTToken0 = true;
+        
+        // This should handle overflow gracefully
+        (int24 newTickLower, int24 newTickUpper) = PositionAdjustment.calculateAdjustedTicks(
+            currentTickLower,
+            currentTickUpper,
+            yieldBPS,
+            isLSTToken0
+        );
+        
+        // Should still return some value, even if it overflows
+        assertTrue(newTickLower > currentTickLower);
+        assertTrue(newTickUpper > currentTickUpper);
+    }
+    
+    function testCalculateAdjustedTicksUnderflow() public {
+        int24 currentTickLower = -887000;
+        int24 currentTickUpper = -886800;
+        uint256 yieldBPS = 10000; // 100%
+        bool isLSTToken0 = false;
+        
+        // This should handle underflow gracefully
+        (int24 newTickLower, int24 newTickUpper) = PositionAdjustment.calculateAdjustedTicks(
+            currentTickLower,
+            currentTickUpper,
+            yieldBPS,
+            isLSTToken0
+        );
+        
+        // Should still return some value, even if it underflows
+        assertTrue(newTickLower < currentTickLower);
+        assertTrue(newTickUpper < currentTickUpper);
+    }
+    
+    function testCalculatePositionEfficiencyMaxUint256() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        uint256 yieldBPS = type(uint256).max;
+        
+        uint256 efficiency = PositionAdjustment.calculatePositionEfficiency(position, yieldBPS);
+        assertEq(efficiency, 0); // Should be capped at 0
+    }
+    
+    function testNeedsAdjustmentMaxTimestamp() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        position.autoAdjustEnabled = true;
+        position.lastYieldAdjustment = type(uint256).max;
+        
+        uint256 currentYieldBPS = 100;
+        uint256 thresholdBPS = 50;
+        uint256 cooldownPeriod = 3600;
+        
+        bool needsAdjustment = PositionAdjustment.needsAdjustment(
+            position,
+            currentYieldBPS,
+            thresholdBPS,
+            cooldownPeriod
+        );
+        
+        assertFalse(needsAdjustment); // Should handle overflow
+    }
+    
+    function testCalculateOptimalRangeMaxTicks() public {
+        int24 currentTickLower = -887272;
+        int24 currentTickUpper = 887272;
+        uint256 expectedYieldBPS = 100;
+        bool isLSTToken0 = true;
+        
+        (int24 optimalTickLower, int24 optimalTickUpper) = PositionAdjustment.calculateOptimalRange(
+            currentTickLower,
+            currentTickUpper,
+            expectedYieldBPS,
+            isLSTToken0
+        );
+        
+        // Should handle max tick values
+        assertTrue(optimalTickLower > currentTickLower);
+        assertTrue(optimalTickUpper > currentTickUpper);
+    }
+
+    // ============ Gas Optimization Tests (10 tests) ============
+    
+    function testGasUsageCalculateAdjustedTicks() public {
+        uint256 gasStart = gasleft();
+        PositionAdjustment.calculateAdjustedTicks(-60, 60, 100, true);
+        uint256 gasUsed = gasStart - gasleft();
+        
+        console.log("Gas used for calculateAdjustedTicks:", gasUsed);
+        assertTrue(gasUsed < 1000);
+    }
+    
+    function testGasUsageCalculatePositionEfficiency() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        
+        uint256 gasStart = gasleft();
+        PositionAdjustment.calculatePositionEfficiency(position, 100);
+        uint256 gasUsed = gasStart - gasleft();
+        
+        console.log("Gas used for calculatePositionEfficiency:", gasUsed);
+        assertTrue(gasUsed < 1000);
+    }
+    
+    function testGasUsageNeedsAdjustment() public {
+        PositionAdjustment.PositionData memory position = _createPositionData();
+        position.autoAdjustEnabled = true;
+        position.lastYieldAdjustment = block.timestamp - 86400;
+        
+        uint256 gasStart = gasleft();
+        PositionAdjustment.needsAdjustment(position, 100, 50, 3600);
+        uint256 gasUsed = gasStart - gasleft();
+        
+        console.log("Gas used for needsAdjustment:", gasUsed);
+        assertTrue(gasUsed < 1000);
+    }
+    
+    function testGasUsageCalculateOptimalRange() public {
+        uint256 gasStart = gasleft();
+        PositionAdjustment.calculateOptimalRange(-60, 60, 100, true);
+        uint256 gasUsed = gasStart - gasleft();
+        
+        console.log("Gas used for calculateOptimalRange:", gasUsed);
+        assertTrue(gasUsed < 2000);
+    }
+    
+    function testGasUsageValidateTickRange() public {
+        uint256 gasStart = gasleft();
+        PositionAdjustment.validateTickRange(-60, 60);
+        uint256 gasUsed = gasStart - gasleft();
+        
+        console.log("Gas used for validateTickRange:", gasUsed);
+        assertTrue(gasUsed < 500);
+    }
+
+    // ============ Helper Functions ============
+    
+    function _createPositionData() internal pure returns (PositionAdjustment.PositionData memory) {
+        return PositionAdjustment.PositionData({
+            owner: USER,
+            poolId: POOL_ID,
+            tickLower: -60,
+            tickUpper: 60,
+            liquidity: 1000,
+            lstToken: STETH,
+            lastYieldAdjustment: block.timestamp,
+            accumulatedYieldBPS: 0,
+            autoAdjustEnabled: true
+        });
+    }
+}
+

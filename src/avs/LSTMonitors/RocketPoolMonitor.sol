@@ -31,6 +31,9 @@ contract RocketPoolMonitor is ILSTYieldMonitor, Ownable, ReentrancyGuard {
     mapping(uint256 => YieldData) public yieldHistory;
     uint256 public yieldDataCounter;
     
+    /// @notice Pause state
+    bool private _paused;
+    
     /// @notice Events
     event YieldDataUpdated(
         uint256 indexed dataId,
@@ -48,6 +51,18 @@ contract RocketPoolMonitor is ILSTYieldMonitor, Ownable, ReentrancyGuard {
     }
     
     constructor() Ownable(msg.sender) {}
+    
+    /// @notice Get rETH contract address
+    /// @return The rETH contract address
+    function rETH() external pure returns (address) {
+        return RETH;
+    }
+    
+    /// @notice Check if contract is paused
+    /// @return True if contract is paused
+    function paused() external view returns (bool) {
+        return _paused;
+    }
     
     /**
      * @notice Verify yield proof from Rocket Pool

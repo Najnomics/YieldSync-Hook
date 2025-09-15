@@ -13,7 +13,7 @@ import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/types/PoolOper
 
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {Pausable as OZPausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 import "../avs/interfaces/IYieldSyncAVS.sol";
 import "../hooks/interfaces/IYieldSyncHook.sol";
@@ -26,7 +26,7 @@ import "../hooks/libraries/LSTDetection.sol";
  * @dev Main Uniswap V4 Hook for automatic LST position adjustment
  * @notice Automatically adjusts LP positions based on LST yield data from EigenLayer AVS
  */
-contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, Pausable, IYieldSyncHook {
+contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, OZPausable, IYieldSyncHook {
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
     using YieldCalculations for YieldCalculations.YieldData;

@@ -4,16 +4,17 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {YieldSyncServiceManager} from "../src/avs/YieldSyncServiceManager.sol";
-import "../src/avs/YieldSyncTaskManager.sol";
-import "../src/avs/LSTMonitors/LidoYieldMonitor.sol";
-import "../src/avs/LSTMonitors/RocketPoolMonitor.sol";
-import "../src/avs/LSTMonitors/CoinbaseMonitor.sol";
-import "../src/avs/LSTMonitors/FraxMonitor.sol";
+import {YieldSyncServiceManager} from "../../src/avs/YieldSyncServiceManager.sol";
+import "../../src/avs/IYieldSyncTaskManager.sol";
+import "../../src/avs/YieldSyncTaskManager.sol";
+import "../../src/avs/LSTMonitors/LidoYieldMonitor.sol";
+import "../../src/avs/LSTMonitors/RocketPoolMonitor.sol";
+import "../../src/avs/LSTMonitors/CoinbaseMonitor.sol";
+import "../../src/avs/LSTMonitors/FraxMonitor.sol";
 import {IAVSDirectory} from "@eigenlayer/contracts/interfaces/IAVSDirectory.sol";
 import {IStakeRegistry} from "@eigenlayer-middleware/interfaces/IStakeRegistry.sol";
 import {IPermissionController} from "@eigenlayer/contracts/interfaces/IPermissionController.sol";
-import {IYieldSyncTaskManager} from "../src/avs/IYieldSyncTaskManager.sol";
+import {IYieldSyncTaskManager} from "../../src/avs/IYieldSyncTaskManager.sol";
 import {IBLSSignatureChecker, IBLSSignatureCheckerTypes} from "@eigenlayer-middleware/interfaces/IBLSSignatureChecker.sol";
 import {BN254} from "@eigenlayer-middleware/libraries/BN254.sol";
 

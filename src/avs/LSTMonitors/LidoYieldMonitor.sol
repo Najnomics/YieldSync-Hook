@@ -30,6 +30,9 @@ contract LidoYieldMonitor is ILSTYieldMonitor, Ownable, ReentrancyGuard {
     mapping(uint256 => YieldData) public yieldHistory;
     uint256 public yieldDataCounter;
     
+    /// @notice Pause state
+    bool private _paused;
+    
     /// @notice Events
     event YieldDataUpdated(
         uint256 indexed dataId,
@@ -48,6 +51,94 @@ contract LidoYieldMonitor is ILSTYieldMonitor, Ownable, ReentrancyGuard {
     }
     
     constructor() Ownable(msg.sender) {}
+    
+    /// @notice Get stETH contract address
+    /// @return The stETH contract address
+    function stETH() external pure returns (address) {
+        return STETH;
+    }
+    
+    /// @notice Check if contract is paused
+    /// @return True if contract is paused
+    function paused() external view returns (bool) {
+        return _paused;
+    }
+    
+    /// @notice Get latest yield data
+    /// @return Latest yield data
+    function getLatestYieldData() external view returns (YieldData memory) {
+        if (yieldDataCounter == 0) {
+            return YieldData(0, 0, 0, 0);
+        }
+        return yieldHistory[yieldDataCounter - 1];
+    }
+    
+    /// @notice Get historical yield data for a timestamp
+    /// @param timestamp The timestamp to query
+    /// @return Historical yield data
+    function getHistoricalYieldData(uint256 timestamp) external view returns (YieldData memory) {
+        // Simple implementation - find closest data point
+        for (uint256 i = yieldDataCounter; i > 0; i--) {
+            YieldData memory data = yieldHistory[i - 1];
+            if (data.lastUpdateTime <= timestamp) {
+                return data;
+            }
+        }
+        return YieldData(0, 0, 0, 0);
+    }
+    
+    /// @notice Get yield data at specific time (alias for getHistoricalYieldData)
+    /// @param timestamp The timestamp to query
+    /// @return Historical yield data
+    function getYieldDataAtTime(uint256 timestamp) external view returns (YieldData memory) {
+        return this.getHistoricalYieldData(timestamp);
+    }
+    
+    /// @notice Calculate annual yield for a principal amount
+    /// @param principal The principal amount
+    /// @return Annual yield amount
+    function calculateAnnualYield(uint256 principal) external view returns (uint256) {
+        if (yieldDataCounter == 0 || principal == 0) {
+            return 0;
+        }
+        YieldData memory data = yieldHistory[yieldDataCounter - 1];
+        return (principal * data.annualYieldRate) / 10000; // basis points to percentage
+    }
+    
+    /// @notice Check if yield rate is within valid range
+    /// @param yieldRate The yield rate in basis points
+    /// @return True if valid
+    function isValidYieldRange(uint256 yieldRate) external pure returns (bool) {
+        return yieldRate >= 200 && yieldRate <= 700; // 2% to 7%
+    }
+    
+    /// @notice Get supported token address
+    /// @return The supported token address
+    function getSupportedToken() external pure returns (address) {
+        return STETH;
+    }
+    
+    /// @notice Get token name
+    /// @return The token name
+    function getTokenName() external pure returns (string memory) {
+        return "Lido Staked Ether";
+    }
+    
+    /// @notice Get token symbol
+    /// @return The token symbol
+    function getTokenSymbol() external pure returns (string memory) {
+        return "stETH";
+    }
+    
+    /// @notice Pause the contract
+    function pause() external onlyOwner {
+        _paused = true;
+    }
+    
+    /// @notice Unpause the contract
+    function unpause() external onlyOwner {
+        _paused = false;
+    }
     
     /**
      * @notice Verify yield proof from Lido
@@ -134,14 +225,6 @@ contract LidoYieldMonitor is ILSTYieldMonitor, Ownable, ReentrancyGuard {
         );
     }
     
-    /**
-     * @notice Get latest yield data
-     * @return data The latest yield data
-     */
-    function getLatestYieldData() external view returns (YieldData memory data) {
-        require(yieldDataCounter > 0, "LidoMonitor: no data available");
-        return yieldHistory[yieldDataCounter - 1];
-    }
     
     /**
      * @notice Get yield data by ID

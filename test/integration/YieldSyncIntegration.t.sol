@@ -4,10 +4,10 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import "../src/hooks/YieldSyncHook.sol";
-import {YieldSyncServiceManager} from "../src/avs/YieldSyncServiceManager.sol";
-import "../src/avs/YieldSyncTaskManager.sol";
-import "../src/avs/LSTMonitors/LidoYieldMonitor.sol";
+import "../../src/hooks/YieldSyncHook.sol";
+import {YieldSyncServiceManager} from "../../src/avs/YieldSyncServiceManager.sol";
+import "../../src/avs/YieldSyncTaskManager.sol";
+import "../../src/avs/LSTMonitors/LidoYieldMonitor.sol";
 
 import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/types/PoolKey.sol";

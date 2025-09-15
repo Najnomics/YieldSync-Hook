@@ -26,7 +26,7 @@ library LSTDetection {
     /// @return lstToken The LST token address
     /// @return pairedToken The paired token address
     /// @return isLSTToken0 Whether LST is token0
-    function detectLSTInPool(PoolKey calldata key) 
+    function detectLSTInPool(PoolKey memory key) 
         internal 
         pure 
         returns (

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@eigenlayer/contracts/../test/utils/BytesLib.sol";
+import "eigenlayer-contracts/src/test/utils/BytesLib.sol";
 import "./IYieldSyncTaskManager.sol";
 import "@eigenlayer-middleware/ServiceManagerBase.sol";
 import {
