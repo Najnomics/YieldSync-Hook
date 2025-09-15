@@ -254,43 +254,8 @@ contract YieldSyncTaskManager is
             task.taskCreatedBlock
         );
         
-        // first for loop iterate over quorums
-        for (uint256 i = 0; i < allOperatorInfo.length; i++) {
-            // second for loop iterate over operators active in the quorum when the task was initialized
-            for (uint256 j = 0; j < allOperatorInfo[i].length; j++) {
-                // get the operator address
-                bytes32 operatorID = allOperatorInfo[i][j].operatorId;
-                address operatorAddress = blsApkRegistry.getOperatorFromPubkeyHash(operatorID);
-                // check whether the operator was a signer for the task
-                bool wasSigningOperator = true;
-                for (uint256 k = 0; k < addressOfNonSigningOperators.length; k++) {
-                    if (operatorAddress == addressOfNonSigningOperators[k]) {
-                        // if the operator was a non-signer, then we set the flag to false
-                        wasSigningOperator = false;
-                        break;
-                    }
-                }
-                if (wasSigningOperator == true) {
-                    OperatorSet memory operatorset =
-                        OperatorSet({avs: serviceManager, id: uint8(task.quorumNumbers[i])});
-                    IStrategy[] memory istrategy = IAllocationManager(allocationManager)
-                        .getStrategiesInOperatorSet(operatorset);
-                    uint256[] memory wadsToSlash = new uint256[](istrategy.length);
-                    for (uint256 z = 0; z < wadsToSlash.length; z++) {
-                        wadsToSlash[z] = WADS_TO_SLASH;
-                    }
-                    IAllocationManagerTypes.SlashingParams memory slashingparams =
-                    IAllocationManagerTypes.SlashingParams({
-                        operator: operatorAddress,
-                        operatorSetId: uint8(task.quorumNumbers[i]),
-                        strategies: istrategy,
-                        wadsToSlash: wadsToSlash,
-                        description: "slash_the_operator"
-                    });
-                    InstantSlasher(instantSlasher).fulfillSlashingRequest(slashingparams);
-                }
-            }
-        }
+        // Process slashing for signing operators
+        _processOperatorSlashing(allOperatorInfo, addressOfNonSigningOperators, task.quorumNumbers);
 
         // the task response has been challenged successfully
         taskSuccessfullyChallenged[referenceTaskIndex] = true;
@@ -300,6 +265,77 @@ contract YieldSyncTaskManager is
 
     function getTaskResponseWindowBlock() external view returns (uint32) {
         return TASK_RESPONSE_WINDOW_BLOCK;
+    }
+
+    /**
+     * @notice Process operator slashing for signing operators
+     * @param allOperatorInfo Array of operators info for each quorum
+     * @param addressOfNonSigningOperators Array of addresses that didn't sign
+     * @param quorumNumbers The quorum numbers for the task
+     */
+    function _processOperatorSlashing(
+        Operator[][] memory allOperatorInfo,
+        address[] memory addressOfNonSigningOperators,
+        bytes calldata quorumNumbers
+    ) internal {
+        // first for loop iterate over quorums
+        for (uint256 i = 0; i < allOperatorInfo.length; i++) {
+            // second for loop iterate over operators active in the quorum when the task was initialized
+            for (uint256 j = 0; j < allOperatorInfo[i].length; j++) {
+                address operatorAddress = blsApkRegistry.getOperatorFromPubkeyHash(allOperatorInfo[i][j].operatorId);
+                
+                // check whether the operator was a signer for the task
+                bool wasSigningOperator = _isSigningOperator(operatorAddress, addressOfNonSigningOperators);
+                
+                if (wasSigningOperator) {
+                    _slashOperator(operatorAddress, uint8(quorumNumbers[i]));
+                }
+            }
+        }
+    }
+
+    /**
+     * @notice Check if an operator was a signing operator
+     * @param operatorAddress The operator address to check
+     * @param addressOfNonSigningOperators Array of non-signing operator addresses
+     * @return wasSigningOperator True if the operator was a signer
+     */
+    function _isSigningOperator(
+        address operatorAddress,
+        address[] memory addressOfNonSigningOperators
+    ) internal pure returns (bool wasSigningOperator) {
+        wasSigningOperator = true;
+        for (uint256 k = 0; k < addressOfNonSigningOperators.length; k++) {
+            if (operatorAddress == addressOfNonSigningOperators[k]) {
+                wasSigningOperator = false;
+                break;
+            }
+        }
+    }
+
+    /**
+     * @notice Slash an operator
+     * @param operatorAddress The operator address to slash
+     * @param operatorSetId The operator set ID
+     */
+    function _slashOperator(address operatorAddress, uint8 operatorSetId) internal {
+        OperatorSet memory operatorset = OperatorSet({avs: serviceManager, id: operatorSetId});
+        IStrategy[] memory strategies = IAllocationManager(allocationManager).getStrategiesInOperatorSet(operatorset);
+        
+        uint256[] memory wadsToSlash = new uint256[](strategies.length);
+        for (uint256 i = 0; i < wadsToSlash.length; i++) {
+            wadsToSlash[i] = WADS_TO_SLASH;
+        }
+        
+        IAllocationManagerTypes.SlashingParams memory slashingParams = IAllocationManagerTypes.SlashingParams({
+            operator: operatorAddress,
+            operatorSetId: operatorSetId,
+            strategies: strategies,
+            wadsToSlash: wadsToSlash,
+            description: "slash_the_operator"
+        });
+        
+        InstantSlasher(instantSlasher).fulfillSlashingRequest(slashingParams);
     }
 
     /**

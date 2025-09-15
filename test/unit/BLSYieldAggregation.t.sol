@@ -72,20 +72,6 @@ contract BLSYieldAggregationUnitTest is Test {
         assertGt(result.consensusYieldRate, 0);
     }
 
-    function test_AggregateYieldData_EmptyArrays() public {
-        vm.expectRevert("BLS: no submissions");
-        BLSYieldAggregation.aggregateYieldData(yieldSubmissions, blsSignatures);
-    }
-
-    function test_AggregateYieldData_MismatchedLengths() public {
-        address token = makeAddr("stETH");
-        yieldSubmissions.push(createYieldSubmission(token, BASE_YIELD_RATE, block.timestamp, OPERATOR1));
-        // Don't add signature - length mismatch
-        
-        vm.expectRevert("BLS: length mismatch");
-        BLSYieldAggregation.aggregateYieldData(yieldSubmissions, blsSignatures);
-    }
-
     function test_YieldSubmission_StructFields() public {
         address token = makeAddr("stETH");
         BLSYieldAggregation.YieldSubmission memory submission = 

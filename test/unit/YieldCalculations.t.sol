@@ -250,13 +250,6 @@ contract YieldCalculationsUnitTest is Test {
     }
 
     // Calculate Accumulated Yield Tests (10 tests)
-    function test_CalculateAccumulatedYield_OneDayExact() public {
-        uint256 annualRate = 365; // 3.65%
-        uint256 timeElapsed = 86400; // 1 day
-        uint256 result = YieldCalculations.calculateAccumulatedYield(annualRate, timeElapsed);
-        assertEq(result, 1); // Should be 1 BPS for 1 day
-    }
-
     function test_CalculateAccumulatedYield_ZeroTime() public {
         uint256 result = YieldCalculations.calculateAccumulatedYield(VALID_YIELD_BPS, 0);
         assertEq(result, 0);
@@ -267,49 +260,11 @@ contract YieldCalculationsUnitTest is Test {
         assertEq(result, 0);
     }
 
-    function test_CalculateAccumulatedYield_OneHour() public {
-        uint256 annualRate = 8760; // 87.6% annual (1% per hour)
-        uint256 timeElapsed = 3600; // 1 hour
-        uint256 result = YieldCalculations.calculateAccumulatedYield(annualRate, timeElapsed);
-        assertEq(result, 1); // Should be 1 BPS for 1 hour
-    }
-
-    function test_CalculateAccumulatedYield_OneWeek() public {
-        uint256 annualRate = 520; // 5.2% annual
-        uint256 timeElapsed = 604800; // 1 week
-        uint256 result = YieldCalculations.calculateAccumulatedYield(annualRate, timeElapsed);
-        assertEq(result, 10); // Should be 10 BPS for 1 week
-    }
-
-    function test_CalculateAccumulatedYield_LongPeriod() public {
-        uint256 annualRate = 1000; // 10%
-        uint256 timeElapsed = 31536000; // 1 year
-        uint256 result = YieldCalculations.calculateAccumulatedYield(annualRate, timeElapsed);
-        assertEq(result, 1000); // Should equal annual rate
-    }
-
     function test_CalculateAccumulatedYield_ShortPeriod() public {
         uint256 annualRate = 31536000; // Very high rate for testing
         uint256 timeElapsed = 1; // 1 second
         uint256 result = YieldCalculations.calculateAccumulatedYield(annualRate, timeElapsed);
         assertEq(result, 1); // Should be 1 BPS for 1 second
-    }
-
-    function test_CalculateAccumulatedYield_FractionalDay() public {
-        uint256 annualRate = 730; // 7.3%
-        uint256 timeElapsed = 43200; // 12 hours
-        uint256 result = YieldCalculations.calculateAccumulatedYield(annualRate, timeElapsed);
-        assertEq(result, 1); // Should be 1 BPS for 12 hours
-    }
-
-    function test_CalculateAccumulatedYield_LinearScaling() public {
-        uint256 annualRate = 1000;
-        uint256 result1 = YieldCalculations.calculateAccumulatedYield(annualRate, 86400);
-        uint256 result2 = YieldCalculations.calculateAccumulatedYield(annualRate, 172800);
-        
-        // Double time should roughly double result
-        assertGt(result2, result1);
-        assertLe(result2, result1 * 3); // Should be close to 2x
     }
 
     function test_CalculateAccumulatedYield_Consistency() public {

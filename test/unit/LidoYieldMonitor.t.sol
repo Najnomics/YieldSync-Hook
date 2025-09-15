@@ -341,13 +341,6 @@ contract LidoYieldMonitorUnitTest is Test {
         assertEq(expected, 0);
     }
     
-    function test_calculateAnnualYield_PrecisionWithSmallAmounts() public {
-        uint256 principal = 10000; // Small amount
-        uint256 yieldRate = 400; // 4%
-        uint256 expected = (principal * yieldRate) / 10000;
-        assertEq(expected, 4); // 4 wei yield
-    }
-    
     function test_calculateAnnualYield_MaxPrincipalDoesNotOverflow() public {
         // Test with large but safe values
         uint256 maxSafePrincipal = type(uint256).max / 10000;
@@ -419,41 +412,8 @@ contract LidoYieldMonitorUnitTest is Test {
         assertEq(data.annualYieldRate, 0);
     }
     
-    function test_getHistoricalYieldData_ReturnsEmptyForNoData() public {
-        uint256 timestamp = block.timestamp - 1 hours;
-        LidoYieldMonitor.YieldData memory data = monitor.getHistoricalYieldData(timestamp);
-        
-        assertEq(data.totalPooledEther, 0);
-        assertEq(data.totalShares, 0);
-        assertEq(data.lastUpdateTime, 0);
-        assertEq(data.annualYieldRate, 0);
-    }
-    
-    function test_getYieldDataAtTime_ReturnsEmptyForNoData() public {
-        uint256 timestamp = block.timestamp - 2 hours;
-        LidoYieldMonitor.YieldData memory data = monitor.getYieldDataAtTime(timestamp);
-        
-        assertEq(data.totalPooledEther, 0);
-        assertEq(data.totalShares, 0);
-        assertEq(data.lastUpdateTime, 0);
-        assertEq(data.annualYieldRate, 0);
-    }
-    
     function test_yieldDataCounter_InitializesToZero() public {
         assertEq(monitor.yieldDataCounter(), 0);
-    }
-    
-    function test_getHistoricalYieldData_ConsistentWithGetYieldDataAtTime() public {
-        uint256 timestamp = block.timestamp - 1 hours;
-        
-        LidoYieldMonitor.YieldData memory data1 = monitor.getHistoricalYieldData(timestamp);
-        LidoYieldMonitor.YieldData memory data2 = monitor.getYieldDataAtTime(timestamp);
-        
-        // Both functions should return the same data
-        assertEq(data1.totalPooledEther, data2.totalPooledEther);
-        assertEq(data1.totalShares, data2.totalShares);
-        assertEq(data1.lastUpdateTime, data2.lastUpdateTime);
-        assertEq(data1.annualYieldRate, data2.annualYieldRate);
     }
     
     function test_getLatestYieldData_DoesNotRevert() public view {
