@@ -31,10 +31,10 @@ test-go::
 	go test ./... -v -p 1
 
 test-forge:
-	cd .devkit/contracts && forge test
+	cd contracts && forge test
 
 clean:
 	rm -rf $(OUT)
-	cd .devkit/contracts && forge clean
+	cd contracts && forge clean
 
 .PHONY: build build-contracts deps test test-go test-forge clean
