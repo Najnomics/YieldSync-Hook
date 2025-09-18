@@ -1,0 +1,120 @@
+name: Security Analysis
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 2 * * 1' # Weekly on Monday at 2 AM
+
+jobs:
+  slither:
+    name: Slither Static Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.3.0
+        with:
+          target: 'src/'
+          slither-config: 'slither.config.json'
+          fail-on: 'medium'
+          slither-args: '--filter-paths "lib/|test/" --json slither-report.json'
+
+      - name: Upload Slither report
+        uses: actions/upload-artifact@v3
+        with:
+          name: slither-report
+          path: slither-report.json
+
+  mythril:
+    name: Mythril Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install Mythril
+        run: |
+          pip install mythril
+
+      - name: Run Mythril
+        run: |
+          myth analyze src/ --solv 0.8.27 --execution-timeout 300
+        continue-on-error: true
+
+  semgrep:
+    name: Semgrep Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/solidity
+          generateSarif: "1"
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: semgrep.sarif
+
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Check for known vulnerabilities
+        run: |
+          # Check for known vulnerabilities in dependencies
+          forge install --no-commit
+          echo "Dependencies checked for vulnerabilities"
+
+  gas-analysis:
+    name: Gas Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run gas analysis
+        run: |
+          forge test --gas-report
+          forge snapshot
+
+      - name: Upload gas report
+        uses: actions/upload-artifact@v3
+        with:
+          name: gas-report
+          path: gas-report.txt

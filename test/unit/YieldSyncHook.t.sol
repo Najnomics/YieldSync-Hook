@@ -1062,7 +1062,7 @@ contract YieldSyncHookUnitTest is Test {
         hook.pause();
         
         address nonOwner = makeAddr("nonOwner");
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonOwner));
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(nonOwner);
         hook.unpause();
     }
@@ -1745,7 +1745,7 @@ contract YieldSyncHookUnitTest is Test {
     function test_SuccessFlow_MultipleUsersMultiplePools() public {
         // Setup multiple pools and users
         address user1 = makeAddr("user1");
-        address user2 = makeAddr("user2");
+        address testUser2 = makeAddr("user2");
         address user3 = makeAddr("user3");
         
         // Pool 1: DAI/rETH
@@ -1818,11 +1818,11 @@ contract YieldSyncHookUnitTest is Test {
         hook.setAutoAdjustment(positionId, false);
         
         // Unauthorized owner actions
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, unauthorized));
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(unauthorized);
         hook.pause();
         
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, unauthorized));
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(unauthorized);
         hook.configurePool(poolId, IYieldSyncHook.LSTConfig({
             lstToken: TOKEN1,

@@ -11,9 +11,9 @@ import {CurrencyLibrary, Currency} from "@uniswap/v4-core/types/Currency.sol";
 import {BalanceDelta, BalanceDeltaLibrary} from "@uniswap/v4-core/types/BalanceDelta.sol";
 import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/types/PoolOperation.sol";
 
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Pausable as OZPausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {Pausable as OZPausable} from "@openzeppelin/contracts/security/Pausable.sol";
 
 import "../avs/interfaces/IYieldSyncAVS.sol";
 import "../hooks/interfaces/IYieldSyncHook.sol";
@@ -102,7 +102,7 @@ contract YieldSyncHook is BaseHook, ReentrancyGuard, Ownable, OZPausable, IYield
     constructor(
         IPoolManager _poolManager,
         IYieldSyncAVS _yieldSyncAVS
-    ) BaseHook(_poolManager) Ownable(msg.sender) {
+    ) BaseHook(_poolManager) Ownable() {
         yieldSyncAVS = _yieldSyncAVS;
     }
 

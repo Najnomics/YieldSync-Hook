@@ -46,9 +46,9 @@ jobs:
           forge test --match-path "test/fuzz/*" -vvv
         id: fuzz-test
 
-      - name: Run Forge coverage
+      - name: Run Forge coverage with IR minimum
         run: |
-          forge coverage --report lcov
+          forge coverage --ir-minimum --report lcov
         id: coverage
 
       - name: Upload coverage reports to Codecov

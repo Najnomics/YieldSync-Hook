@@ -1,0 +1,152 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run unit tests
+        run: |
+          forge test --match-contract "*Test" --no-match-test "testFuzz" -vv
+
+  fuzz-tests:
+    name: Fuzz Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run fuzz tests
+        run: |
+          forge test --match-test "testFuzz" --fuzz-runs 10000 -vv
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run integration tests
+        run: |
+          forge test --match-path "test/integration/*" -vv
+
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Start Anvil
+        run: |
+          anvil --host 0.0.0.0 --port 8545 --chain-id 31337 &
+          sleep 10
+
+      - name: Deploy contracts
+        run: |
+          forge script script/DeployAnvil.s.sol:DeployAnvil \
+            --rpc-url http://localhost:8545 \
+            --broadcast \
+            -vvvv
+        env:
+          PRIVATE_KEY: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+
+      - name: Run E2E tests
+        run: |
+          forge test --match-path "test/e2e/*" -vv
+
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run coverage with IR minimum
+        run: |
+          forge coverage --ir-minimum --report lcov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./lcov.info
+          flags: foundry
+          name: foundry-coverage
+          fail_ci_if_error: false
+
+  avs-tests:
+    name: AVS Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install AVS dependencies
+        run: |
+          cd avs && npm ci
+
+      - name: Run AVS tests
+        run: |
+          cd avs && npm test
+
+      - name: Run E2E tests
+        run: |
+          cd avs && npm run test:e2e
